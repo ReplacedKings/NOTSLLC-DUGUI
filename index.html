@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1a1a1a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Interactive Flipbook</title>
+    <!-- jQuery (with fallback) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        if (typeof jQuery === 'undefined') {
+            document.write('<script src="js/jquery-3.6.0.min.js"><\/script>');
+        }
+    </script>
+    <!-- Turn.js (with fallback) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"></script>
+    <script>
+        if (typeof $.fn.turn === 'undefined') {
+            document.write('<script src="js/turn.min.js"><\/script>');
+        }
+    </script>
+    <audio id="flipSound" src="images/page-flip-47177.mp3" preload="auto"></audio>
+    <audio id="bgMusic" preload="auto" loop></audio>
+    <style>
+        :root {
+            --primary-bg: #1a1a1a;
+            --secondary-bg: #2a2a2a;
+            --text-color: #fff;
+            --accent-color: #4a90e2;
+            --page-bg: #fff;
+            --shadow-color: rgba(0,0,0,0.7);
+            --loading-bg: rgba(0,0,0,0.8);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            background: var(--primary-bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            padding: 20px;
+            color: var(--text-color);
+            cursor: pointer;
+            touch-action: manipulation;
+            overflow-x: hidden;
+        }
+
+        .flipbook-container {
+            width: fit-content;
+            -moz-width: fit-content;
+            max-width: 1040px;
+            height: auto;
+            margin: 20px auto;
+            position: relative;
+            background: var(--secondary-bg);
+            box-shadow: 0 0 30px var(--shadow-color);
+            overflow: hidden;
+            border-radius: 15px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        #book {
+            min-height: 400px;
+            background: var(--page-bg);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            z-index: 1;
+        }
+
+        .page {
+            background: var(--page-bg);
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+        }
+
+        .page img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            transition: transform 0.3s ease;
+        }
+
+        .page:hover img {
+            transform: scale(1.02);
+        }
+
+        .hard {
+            background: var(--secondary-bg);
+            color: var(--text-color);
+            text-align: center;
+            font-weight: bold;
+            cursor: pointer;
+            overflow: hidden;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .hard.p1, .hard.p2 {
+            background: var(--primary-bg);
+            color: var(--text-color);
+        }
+
+        /* Enhanced back cover styles */
+        .hard.p2 {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+
+        .hard.p2:hover {
+            transform: scale(1.02);
+        }
+
+        .hard.p2::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 20%, rgba(74, 144, 226, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(74, 144, 226, 0.15) 0%, transparent 50%);
+            pointer-events: none;
+            animation: gradientShift 8s ease-in-out infinite;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .hard.p2::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                linear-gradient(45deg, transparent 48%, rgba(74, 144, 226, 0.15) 49%, rgba(74, 144, 226, 0.15) 51%, transparent 52%),
+                linear-gradient(-45deg, transparent 48%, rgba(74, 144, 226, 0.15) 49%, rgba(74, 144, 226, 0.15) 51%, transparent 52%);
+            background-size: 30px 30px;
+            opacity: 0.5;
+            pointer-events: none;
+            animation: patternShift 20s linear infinite;
+        }
+
+        @keyframes patternShift {
+            0% { background-position: 0 0; }
+            100% { background-position: 60px 60px; }
+        }
+
+        .hard.p2 .back-cover-content {
+            position: relative;
+            z-index: 1;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .hard.p2 .back-cover-title {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            background: linear-gradient(45deg, #fff, #4a90e2);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            position: relative;
+            padding-bottom: 15px;
+        }
+
+        .hard.p2 .back-cover-title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #4a90e2, transparent);
+        }
+
+        .hard.p2 .back-cover-subtitle {
+            font-size: 16px;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 20px;
+            text-align: center;
+            max-width: 80%;
+            line-height: 1.6;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .hard.p2 .back-cover-decoration {
+            width: 70px;
+            height: 70px;
+            border: 2px solid rgba(74, 144, 226, 0.3);
+            border-radius: 50%;
+            position: relative;
+            margin: 25px 0;
+            animation: rotate 20s linear infinite;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .hard.p2 .back-cover-decoration::before,
+        .hard.p2 .back-cover-decoration::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            border: 2px solid rgba(74, 144, 226, 0.2);
+            animation: pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+            50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.8; }
+        }
+
+        .hard.p2 .back-cover-decoration::before {
+            width: 90px;
+            height: 90px;
+            animation-delay: -1s;
+        }
+
+        .hard.p2 .back-cover-decoration::after {
+            width: 110px;
+            height: 110px;
+            animation-delay: -2s;
+        }
+
+        /* Add subtle shine effect */
+        .hard.p2::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                45deg,
+                transparent 0%,
+                rgba(255, 255, 255, 0.03) 30%,
+                rgba(255, 255, 255, 0.05) 40%,
+                transparent 50%
+            );
+            transform: rotate(45deg);
+            animation: shine 8s infinite;
+            pointer-events: none;
+        }
+
+        @keyframes shine {
+            0% { transform: translateX(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) rotate(45deg); }
+        }
+
+        .hard img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            pointer-events: none;
+        }
+
+        .page-number {
+            position: absolute;
+            bottom: 15px;
+            font-size: 14px;
+            color: #666;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+
+        .page-number.left {
+            left: 20px;
+        }
+
+        .page-number.right {
+            right: 20px;
+        }
+
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--loading-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            color: var(--text-color);
+            font-size: 24px;
+            font-family: inherit;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .loading::after {
+            content: '';
+            width: 40px;
+            height: 40px;
+            margin-left: 15px;
+            border: 3px solid var(--text-color);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: loading-spinner 1s linear infinite;
+        }
+
+        @keyframes loading-spinner {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Mobile-specific styles */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+                background: var(--primary-bg);
+                touch-action: pan-y pinch-zoom;
+            }
+
+            .flipbook-container {
+                padding: 10px;
+                margin: 10px auto;
+                border-radius: 12px;
+                box-shadow: 0 0 30px var(--shadow-color);
+                touch-action: pan-y pinch-zoom;
+                width: auto;
+                max-width: none;
+                overflow: hidden;
+            }
+
+            #book {
+                min-height: 350px;
+                border-radius: 8px;
+                touch-action: pan-y pinch-zoom;
+                position: relative;
+                z-index: 1;
+            }
+
+            .page {
+                width: 50% !important;
+                box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+                touch-action: pan-y pinch-zoom;
+            }
+
+            .page img {
+                border-radius: 0;
+                touch-action: pan-y pinch-zoom;
+                -webkit-user-drag: none;
+                user-select: none;
+                max-width: none;
+            }
+
+            .page-number {
+                font-size: 13px;
+                padding: 6px 10px;
+                bottom: 10px;
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(5px);
+                -webkit-backdrop-filter: blur(5px);
+                touch-action: none;
+            }
+
+            .page-number.left {
+                left: 15px;
+            }
+
+            .page-number.right {
+                right: 15px;
+            }
+
+            /* Mobile touch indicators */
+            .mobile-touch-hint {
+                position: fixed;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 10px 20px;
+                border-radius: 20px;
+                font-size: 14px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                z-index: 1000;
+                animation: fadeInOut 3s ease-in-out;
+                pointer-events: none;
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+            }
+
+            .mobile-touch-hint::before {
+                content: '←';
+                font-size: 18px;
+            }
+
+            .mobile-touch-hint::after {
+                content: '→';
+                font-size: 18px;
+            }
+
+            @keyframes fadeInOut {
+                0%, 100% { opacity: 0; }
+                20%, 80% { opacity: 1; }
+            }
+        }
+
+        /* Remove open book related styles */
+        .book-closed, .book-open, .open-book-button {
+            display: none;
+        }
+
+        /* Touch feedback */
+        .touch-feedback {
+            position: fixed;
+            pointer-events: none;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 70%);
+            transform: translate(-50%, -50%);
+            animation: touch-feedback 0.4s ease-out forwards;
+            z-index: 1000;
+        }
+
+        @keyframes touch-feedback {
+            0% {
+                transform: translate(-50%, -50%) scale(0.5);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        /* Page turn indicators */
+        .page-turn-indicator {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+
+        .page-turn-indicator.left {
+            left: 10px;
+        }
+
+        .page-turn-indicator.right {
+            right: 10px;
+        }
+
+        .page-turn-indicator::after {
+            content: '';
+            width: 10px;
+            height: 10px;
+            border-top: 2px solid var(--text-color);
+            border-right: 2px solid var(--text-color);
+        }
+
+        .page-turn-indicator.left::after {
+            transform: rotate(-135deg);
+            margin-left: 5px;
+        }
+
+        .page-turn-indicator.right::after {
+            transform: rotate(45deg);
+            margin-right: 5px;
+        }
+
+        #book:hover .page-turn-indicator {
+            opacity: 1;
+        }
+
+        /* Loading animation */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        /* Add music control styles */
+        .music-control {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            transition: all 0.3s ease;
+        }
+
+        .music-control:hover {
+            transform: scale(1.1);
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        .music-control::before {
+            content: '♪';
+            color: white;
+            font-size: 20px;
+        }
+
+        .music-control.muted::before {
+            content: '♫';
+            opacity: 0.5;
+        }
+
+        @media (max-width: 768px) {
+            .music-control {
+                bottom: 15px;
+                right: 15px;
+                width: 35px;
+                height: 35px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading">Loading Flipbook</div>
+    <div class="mobile-touch-hint">Swipe to turn pages</div>
+    <div class="music-control" title="Toggle Background Music"></div>
+
+    <div class="flipbook-container fade-in">
+        <div id="book">
+            <div class="page">
+                <img src="images\Artboard 28.jpg" alt="Page 1" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number left">1</div>
+            </div>
+            <div class="page">
+                <img src="images/30-min.jpg" alt="Page 2" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number left">2</div>
+            </div>
+            <div class="page">
+                <img src="images/31-min.jpg" alt="Page 3" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number right">3</div>
+            </div>
+            <div class="page">
+                <img src="images/32-min.jpg" alt="Page 4" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number left">4</div>
+            </div>
+            <div class="page">
+                <img src="images/33-min.jpg" alt="Page 5" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number right">5</div>
+            </div>
+            <div class="page">
+                <img src="images/34-min.jpg" alt="Page 6" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number left">6</div>
+            </div>
+            <div class="page">
+                <img src="images/35-min.jpg" alt="Page 7" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number right">7</div>
+            </div>
+            <div class="page">
+                <img src="images/36-min.jpg" alt="Page 8" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number left">8</div>
+            </div>
+            <div class="page">
+                <img src="images/38-min.jpg" alt="Page 9" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number right">9</div>
+            </div>
+            <div class="page">
+                <img src="images/39-min.jpg" alt="Page 10" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number left">10</div>
+            </div>
+            <div class="page">
+                <img src="images/40-min.jpg" alt="Page 11" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number right">11</div>
+            </div>
+            <div class="page">
+                <img src="images/41-min.jpg" alt="Page 12" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number left">12</div>
+            </div>
+            <div class="page">
+                <img src="images/42-min.jpg" alt="Page 13" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number right">13</div>
+            </div>
+            <div class="page">
+                <img src="images/Artboard 1-min.jpg" alt="Page 14" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number left">14</div>
+            </div>
+            <div class="page">
+                <img src="images/Artboard 4-min.jpg" alt="Page 15" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number right">15</div>
+            </div>
+            <div class="page">
+                <img src="images/Artboard 6-min.jpg" alt="Page 16" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number left">16</div>
+            </div>
+            <div class="page">
+                <img src="images/Artboard 7-min.jpg" alt="Page 17" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number right">17</div>
+            </div>
+            <div class="page">
+                <img src="images/Artboard 9-min.jpg" alt="Page 18" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number left">18</div>
+            </div>
+            <div class="page">
+                <img src="images/Artboard 12-min.jpg" alt="Page 19" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number right">19</div>
+            </div>
+            <div class="page">
+                <img src="images/Artboard 13-min.jpg" alt="Page 20" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number left">20</div>
+            </div>
+            <div class="page">
+                <img src="images/Artboard 14-min.jpg" alt="Page 21" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number right">21</div>
+            </div>
+            <div class="page">
+                <img src="images/Artboard 15-min.jpg" alt="Page 22" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number left">22</div>
+            </div>
+            <div class="page">
+                <img src="images/Artboard 16-min.jpg" alt="Page 23" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number right">23</div>
+            </div>
+            <div class="page">
+                <img src="images/Artboard 17-min.jpg" alt="Page 24" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number left">24</div>
+            </div>
+            <div class="page">
+                <img src="images/Artboard 19-min.jpg" alt="Page 25" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number right">25</div>
+            </div>
+            <div class="page">
+                <img src="images/Artboard 20-min.jpg" alt="Page 26" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number left">26</div>
+            </div>
+            <div class="page">
+                <img src="images/Artboard 23-min.jpg" alt="Page 27" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number right">27</div>
+            </div>
+            <div class="page">
+                <img src="images/Artboard 24-min.jpg" alt="Page 28" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number left">28</div>
+            </div>
+            <div class="page">
+                <img src="images/Artboard 26-min.jpg" alt="Page 29" style="width: 100%; height: 100%; object-fit: contain;">
+                <div class="page-number right">29</div>
+            </div>
+            <div class="page hard p2">
+                <div class="back-cover-content">
+                    <div class="back-cover-title">Thank You</div>
+                    <div class="back-cover-subtitle">We hope you enjoyed reading our interactive flipbook</div>
+                    <div class="back-cover-decoration"></div>
+                    <div class="back-cover-subtitle">© 2024 All Rights Reserved</div>
+                </div>
+            </div>
+        </div>
+        <div class="page-turn-indicator left"></div>
+        <div class="page-turn-indicator right"></div>
+    </div>
+
+    <script>
+        function initializeBook() {
+            const book = $("#book");
+            const flipSound = document.getElementById('flipSound');
+            const bgMusic = document.getElementById('bgMusic');
+            let soundEnabled = true;
+            let bgMusicEnabled = true;
+            let touchStartX = 0;
+            let touchStartY = 0;
+            const SWIPE_THRESHOLD = 30;
+            let isFirstLoad = true;
+            let touchTimeout;
+            let autoTurnTimer = null;
+            const AUTO_TURN_INTERVAL = 10000; // 10 seconds for desktop
+            const MOBILE_AUTO_TURN_INTERVAL = 10000; // 10 seconds for mobile
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            const currentAutoTurnInterval = isMobile ? MOBILE_AUTO_TURN_INTERVAL : AUTO_TURN_INTERVAL;
+            let isUserInteracting = false;
+            let touchInteractionTimeout;
+
+            // Initialize background music
+            bgMusic.volume = 0.3; // Set initial volume to 30%
+            
+            // Music control functionality
+            $('.music-control').on('click', function() {
+                if (bgMusicEnabled) {
+                    bgMusic.pause();
+                    $(this).addClass('muted');
+                } else {
+                    try {
+                        if (!bgMusic.src) {
+                            bgMusic.src = "The Nature Is (Main).mp3";
+                        }
+                        bgMusic.play().catch(function(error) {
+                            console.log("Background music play failed:", error);
+                            $(this).addClass('muted');
+                            bgMusicEnabled = false;
+                        });
+                    } catch (error) {
+                        console.log("Background music error:", error);
+                        $(this).addClass('muted');
+                        bgMusicEnabled = false;
+                    }
+                }
+                bgMusicEnabled = !bgMusicEnabled;
+            });
+
+            // Start background music when user interacts with the page
+            function startBackgroundMusic() {
+                if (bgMusicEnabled) {
+                    try {
+                        if (!bgMusic.src) {
+                            bgMusic.src = "The Nature Is (Main).mp3";
+                        }
+                        bgMusic.play().catch(function(error) {
+                            console.log("Background music autoplay failed:", error);
+                            $('.music-control').addClass('muted');
+                            bgMusicEnabled = false;
+                        });
+                    } catch (error) {
+                        console.log("Background music error:", error);
+                        $('.music-control').addClass('muted');
+                        bgMusicEnabled = false;
+                    }
+                }
+            }
+
+            // Add event listeners for user interaction to start music
+            document.addEventListener('click', startBackgroundMusic, { once: true });
+            document.addEventListener('touchstart', startBackgroundMusic, { once: true });
+
+            // Function to play sound with fallback
+            function playFlipSound() {
+                if (flipSound && soundEnabled) {
+                    try {
+                        flipSound.currentTime = 0;
+                        const playPromise = flipSound.play();
+                        if (playPromise !== undefined) {
+                            playPromise.catch(error => {
+                                console.log('Sound play failed:', error);
+                                return true;
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Sound error:', e);
+                        // If sound fails to play, continue with the page turn
+                        return true;
+                    }
+                }
+                return true;
+            }
+
+            // Preload images with progress tracking
+            const images = book.find('img');
+            let loadedImages = 0;
+            const totalImages = images.length;
+            const loadingText = $('.loading');
+
+            function updateLoadingProgress() {
+                const progress = Math.round((loadedImages / totalImages) * 100);
+                loadingText.text(`Loading Flipbook (${progress}%)`);
+            }
+
+            images.each(function() {
+                const img = new Image();
+                img.onload = function() {
+                    loadedImages++;
+                    updateLoadingProgress();
+                    if (loadedImages === totalImages) {
+                        setTimeout(() => {
+                            loadingText.fadeOut(500, function() {
+                                initializeTurn();
+                            });
+                        }, 500);
+                    }
+                };
+                img.onerror = function() {
+                    console.error('Failed to load image:', this.src);
+                    loadedImages++;
+                    updateLoadingProgress();
+                    if (loadedImages === totalImages) {
+                        setTimeout(() => {
+                            loadingText.fadeOut(500, function() {
+                                initializeTurn();
+                            });
+                        }, 500);
+                    }
+                };
+                img.src = $(this).attr('src');
+            });
+
+            function initializeTurn() {
+                let isTurning = false;
+                let lastPage = 1;
+                let touchStartTime = 0;
+                let lastInteractionTime = Date.now();
+
+                // Function to handle user interaction
+                function handleUserInteraction() {
+                    isUserInteracting = true;
+                    clearTimeout(touchInteractionTimeout);
+                    touchInteractionTimeout = setTimeout(() => {
+                        isUserInteracting = false;
+                    }, 2000); // Reset after 2 seconds of no interaction
+                }
+
+                function startAutoTurn() {
+                    if (autoTurnTimer) clearInterval(autoTurnTimer);
+                    autoTurnTimer = setInterval(() => {
+                        const currentTime = Date.now();
+                        // Only auto-flip if no interaction for the specified interval
+                        if (currentTime - lastInteractionTime >= currentAutoTurnInterval) {
+                            const currentPage = book.turn('page');
+                            const totalPages = book.turn('pages');
+                            
+                            // Play sound before turning
+                            playFlipSound();
+
+                            // Turn to next page or loop back to first
+                            if (currentPage >= totalPages - 1) {
+                                // Force turn to first page immediately
+                                book.turn('page', 1);
+                                console.log('Looping back to page 1');
+                            } else {
+                                // Turn to next page
+                                book.turn('next');
+                                console.log('Turning to next page');
+                            }
+                        }
+                    }, isMobile ? 10000 : 1000); // Use 10 second interval for mobile, 1 second for desktop
+                }
+
+                function updateLastInteraction() {
+                    lastInteractionTime = Date.now();
+                }
+
+                try {
+                    const bodyHorizontalPadding = parseFloat($('body').css('padding-left')) + parseFloat($('body').css('padding-right'));
+                    const containerHorizontalPadding = parseFloat($('.flipbook-container').css('padding-left')) + parseFloat($('.flipbook-container').css('padding-right'));
+                    const bookAspectRatio = 1.45; 
+                    const maxBookContentWidth = 1000; 
+                    const minBookContentHeight = 700; 
+
+                    let bookDesiredWidth = Math.min(window.innerWidth - bodyHorizontalPadding - containerHorizontalPadding, maxBookContentWidth);
+                    let bookDesiredHeight = bookDesiredWidth / bookAspectRatio;
+
+                    // Ensure the book doesn't go below a certain height, adjusting width if necessary
+                    if (bookDesiredHeight < minBookContentHeight) {
+                        bookDesiredHeight = minBookContentHeight;
+                        bookDesiredWidth = bookDesiredHeight * bookAspectRatio;
+                        // Re-check against availableWidth and maxBookContentWidth if height constraint pushed width too far
+                        if (bookDesiredWidth > (window.innerWidth - bodyHorizontalPadding - containerHorizontalPadding)) {
+                            bookDesiredWidth = window.innerWidth - bodyHorizontalPadding - containerHorizontalPadding;
+                            bookDesiredHeight = bookDesiredWidth / bookAspectRatio;
+                        }
+                        if (bookDesiredWidth > maxBookContentWidth) {
+                             bookDesiredWidth = maxBookContentWidth;
+                             bookDesiredHeight = bookDesiredWidth / bookAspectRatio;
+                        }
+                    }
+
+                    book.turn({
+                        width: bookDesiredWidth,
+                        height: bookDesiredHeight,
+                        autoCenter: true,
+                        display: 'double',
+                        elevation: 50,
+                        gradients: true,
+                        duration: 800,
+                        acceleration: true,
+                        when: {
+                            turning: function(e, page, view) {
+                                isTurning = true;
+                                playFlipSound();
+                            },
+                            turned: function(e, page, view) {
+                                isTurning = false;
+                                lastPage = page;
+                                localStorage.setItem('currentPage', page);
+                                console.log('Turned to page:', page);
+
+                                // Update page turn indicators
+                                $('.page-turn-indicator.left').css('opacity', page > 1 ? 1 : 0);
+                                $('.page-turn-indicator.right').css('opacity', page < book.turn('pages') ? 1 : 0);
+                                
+                                // Update last interaction time
+                                updateLastInteraction();
+                            }
+                        }
+                    });
+
+                    // Enhanced touch handling
+                    book.on('touchstart', function(e) {
+                        if (isTurning) return;
+                        handleUserInteraction();
+                        
+                        const touch = e.originalEvent.touches[0];
+                        touchStartX = touch.clientX;
+                        touchStartY = touch.clientY;
+                        touchStartTime = Date.now();
+
+                        // Only show touch feedback for single touch
+                        if (e.originalEvent.touches.length === 1) {
+                            const touchFeedback = $('<div class="touch-feedback"></div>');
+                            touchFeedback.css({
+                                left: touchStartX + 'px',
+                                top: touchStartY + 'px'
+                            });
+                            $('body').append(touchFeedback);
+                            setTimeout(() => touchFeedback.remove(), 400);
+                        }
+
+                        // Clear any existing timeout
+                        clearTimeout(touchTimeout);
+                    });
+
+                    book.on('touchmove', function(e) {
+                        if (isTurning) return;
+                        handleUserInteraction();
+                        
+                        // Only prevent default for single touch swipes
+                        if (e.originalEvent.touches.length === 1) {
+                            e.preventDefault();
+                        }
+                    });
+
+                    book.on('touchend', function(e) {
+                        if (isTurning) return;
+                        handleUserInteraction();
+
+                        const touch = e.originalEvent.changedTouches[0];
+                        const touchEndX = touch.clientX;
+                        const touchEndY = touch.clientY;
+                        const touchEndTime = Date.now();
+
+                        const deltaX = touchEndX - touchStartX;
+                        const deltaY = touchEndY - touchStartY;
+                        const touchDuration = touchEndTime - touchStartTime;
+
+                        // Check if it's a quick swipe (less than 300ms)
+                        if (touchDuration < 300 && Math.abs(deltaX) > Math.abs(deltaY)) {
+                            if (Math.abs(deltaX) > SWIPE_THRESHOLD) {
+                                if (deltaX > 0) {
+                                    book.turn('previous');
+                                } else {
+                                    book.turn('next');
+                                }
+                            }
+                        }
+                    });
+
+                    // Click navigation (desktop only)
+                    book.on('click', function(e) {
+                        if (isTurning || 'ontouchstart' in window) return;
+
+                        const bookWidth = book.width();
+                        const clickX = e.pageX - book.offset().left;
+
+                        if (clickX > bookWidth / 2) {
+                            book.turn('next');
+                        } else {
+                            book.turn('previous');
+                        }
+                        
+                        updateLastInteraction();
+                    });
+
+                    // Keyboard navigation
+                    $(document).keydown(function(e) {
+                        if (isTurning) return;
+                        if (e.key === "ArrowRight") {
+                            book.turn('next');
+                            updateLastInteraction();
+                        }
+                        else if (e.key === "ArrowLeft") {
+                            book.turn('previous');
+                            updateLastInteraction();
+                        }
+                    });
+
+                    // Handle window resize
+                    let resizeTimer;
+                    $(window).on('resize', function() {
+                        clearTimeout(resizeTimer);
+                        resizeTimer = setTimeout(function() {
+                            const bodyHorizontalPadding = parseFloat($('body').css('padding-left')) + parseFloat($('body').css('padding-right'));
+                            const containerHorizontalPadding = parseFloat($('.flipbook-container').css('padding-left')) + parseFloat($('.flipbook-container').css('padding-right'));
+
+                            let newBookDesiredWidth = Math.min(window.innerWidth - bodyHorizontalPadding - containerHorizontalPadding, maxBookContentWidth);
+                            let newBookDesiredHeight = newBookDesiredWidth / bookAspectRatio;
+
+                            if (newBookDesiredHeight < minBookContentHeight) {
+                                newBookDesiredHeight = minBookContentHeight;
+                                newBookDesiredWidth = newBookDesiredHeight * bookAspectRatio;
+                                if (newBookDesiredWidth > (window.innerWidth - bodyHorizontalPadding - containerHorizontalPadding)) {
+                                    newBookDesiredWidth = window.innerWidth - bodyHorizontalPadding - containerHorizontalPadding;
+                                    newBookDesiredHeight = newBookDesiredWidth / bookAspectRatio;
+                                }
+                                if (newBookDesiredWidth > maxBookContentWidth) {
+                                     newBookDesiredWidth = maxBookContentWidth;
+                                     newBookDesiredHeight = newBookDesiredWidth / bookAspectRatio;
+                                }
+                            }
+
+                            book.turn('size', newBookDesiredWidth, newBookDesiredHeight);
+                            
+                        }, 250);
+                    });
+
+                    // Start auto-turning after initialization with a delay
+                    setTimeout(() => {
+                        console.log('Starting auto-turn');
+                        startAutoTurn();
+                    }, 2000); // Increased delay to ensure everything is loaded
+
+                } catch (e) {
+                    console.error("Turn.js initialization error:", e);
+                    alert('Error initializing the flipbook. Please refresh the page and try again.');
+                }
+            }
+        }
+
+        // Initialize on window load
+        $(window).on('load', function() {
+            initializeBook();
+        });
+    </script>
+</body>
+</html>
