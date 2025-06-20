@@ -776,19 +776,21 @@
                 function startAutoTurn() {
                     if (autoTurnTimer) clearInterval(autoTurnTimer);
                     autoTurnTimer = setInterval(() => {
-                        const currentTime = Date.now();
-                        if (currentTime - lastInteractionTime >= currentAutoTurnInterval) {
-                            const currentPage = book.turn('page');
-                            const totalPages = book.turn('pages');
-                            playFlipSound();
-                            if (currentPage >= totalPages - 1) {
-                                book.turn('page', 1);
-                                console.log('Looping back to page 1');
-                            } else {
+                    const currentTime = Date.now();
+                            if (currentTime - lastInteractionTime >= currentAutoTurnInterval) {
+                                const currentPage = book.turn('page');
+                                const totalPages = book.turn('pages');
+                                playFlipSound();
+                                if (currentPage >= totalPages - 1) {
+                                    book.turn('page', 1);
+                                    console.log('Looping back to page 1');
+                                } else {
                                 book.turn('next');
                                 console.log('Turning to next page');
+                                }
                             }
-                        }
+                        }, currentAutoTurnInterval); // ✅ Use correct interval
+
                     }, isMobile ? 10000 : 1000); 
                 }
 
